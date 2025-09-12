@@ -322,6 +322,8 @@ class SarifResult {
   uint32_t RuleIdx;
   std::string RuleId;
   std::string DiagnosticMessage;
+  std::string HostedViewerURI;
+  llvm::SmallDenseMap<StringRef, std::string, 4> PartialFingerprints;
   llvm::SmallVector<CharSourceRange, 8> Locations;
   llvm::SmallVector<ThreadFlow, 8> ThreadFlows;
   std::optional<SarifResultLevel> LevelOverride;
@@ -346,6 +348,11 @@ public:
     DiagnosticMessage = Message.str();
     return *this;
   }
+    
+  SarifResult setHostedViewerURI(llvm::StringRef URI) {
+    HostedViewerURI = URI.str();
+    return *this;
+  }
 
   SarifResult setLocations(llvm::ArrayRef<CharSourceRange> DiagLocs) {
 #ifndef NDEBUG
@@ -364,6 +371,11 @@ public:
 
   SarifResult setDiagnosticLevel(const SarifResultLevel &TheLevel) {
     LevelOverride = TheLevel;
+    return *this;
+  }
+    
+  SarifResult addPartialFingerprint(llvm::StringRef key, llvm::StringRef value) {
+    PartialFingerprints[key] = value;
     return *this;
   }
 };
@@ -475,6 +487,8 @@ public:
   /// reported diagnostics, resulting in an expensive call.
   llvm::json::Object createDocument();
 
+  static std::string fileNameToURI(llvm::StringRef Filename);
+    
 private:
   /// Source Manager to use for the current SARIF document.
   const SourceManager &SourceMgr;
