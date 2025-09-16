@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "HTMLDiagnostics.h"
 #include "PlistDiagnostics.h"
 #include "SarifDiagnostics.h"
 #include "clang/AST/Decl.h"
@@ -82,7 +83,7 @@ public:
   void FlushDiagnosticsImpl(std::vector<const PathDiagnostic *> &Diags,
                             FilesMade *filesMade) override;
 
-  StringRef getName() const override { return "HTMLDiagnostics"; }
+  StringRef getName() const override { return HTML_DIAGNOSTICS_NAME; }
 
   bool supportsCrossFileDiagnostics() const override {
     return SupportsCrossFileDiagnostics;
@@ -369,6 +370,12 @@ void HTMLDiagnostics::ReportDiag(const PathDiagnostic& D,
     if (EC != llvm::errc::file_exists) {
       llvm::errs() << "warning: could not create file in '" << Directory
                    << "': " << EC.message() << '\n';
+    } else if (filesMade) {
+      // Record that we created the file so that it gets referenced in the
+      // plist and SARIF reports for every translation unit that found the
+      // issue.
+      filesMade->addDiagnostic(D, getName(),
+                               llvm::sys::path::filename(ResultPath));
     }
     return;
   }
