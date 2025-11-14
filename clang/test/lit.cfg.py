@@ -89,6 +89,24 @@ config.substitutions.append(("%target_triple", config.target_triple))
 
 config.substitutions.append(("%PATH%", config.environment["PATH"]))
 
+sed_cmd = "/opt/freeware/bin/sed" if "system-aix" in config.available_features else "sed"
+
+# Filtering command for testing SARIF output against reference output.
+config.substitutions.append(
+    (
+        "%normalize_sarif",
+        f"{sed_cmd} -r '%s;%s;%s;%s'"
+        % (
+            # Replace version strings that are likely to change.
+            r's/"version": ".* version .*"/"version": "[clang version]"/',
+            r's/"version": "2.1.0"/"version": "[SARIF version]"/',
+            # Strip directories from file URIs
+            r's/"file:(\/+)([^"\/]+\/)*([^"]+)"/"file:\1[...]\/\3"/',
+            # Set "length" to -1
+            r's/"length": [[:digit:]]+/"length": -1/'
+        ),
+    )
+)
 
 # For each occurrence of a clang tool name, replace it with the full path to
 # the build directory holding that tool.  We explicitly specify the directories

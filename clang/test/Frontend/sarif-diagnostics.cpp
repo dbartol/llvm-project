@@ -1,5 +1,5 @@
 // RUN: %clang -fsyntax-only -Wall -Wextra -fdiagnostics-format=sarif %s > %t 2>&1 || true
-// RUN: FileCheck -dump-input=always %s --input-file=%t
+// RUN: cat %t | %normalize_sarif | diff -U1 -b %S/Inputs/expected-sarif/sarif-diagnostics.cpp.sarif -
 
 // FIXME: this test is incredibly fragile because the `main()` function
 // must be on line 12 in order for the CHECK lines to get the correct line
