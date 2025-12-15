@@ -16,8 +16,13 @@
 #ifndef LLVM_CLANG_TOOLING_CORE_DIAGNOSTIC_H
 #define LLVM_CLANG_TOOLING_CORE_DIAGNOSTIC_H
 
+// Please do not #include Clang headers in this file. This file can be used as a
+// header-only library from clang-tblgen, and consuming Clang headers here will
+// create a circular dependency. It _is_ acceptable to forward-declare types
+// from the "clang" namespace, as long as the consuming code in clang-tblgen
+// does not need to use any of the functions that use the forward-declared
+// types.
 #include "Replacement.h"
-#include "clang/Basic/Diagnostic.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -40,7 +45,8 @@ struct FileByteRange {
 /// Represents the diagnostic message with the error message associated
 /// and the information on the location of the problem.
 struct DiagnosticMessage {
-  DiagnosticMessage(llvm::StringRef Message = "");
+  DiagnosticMessage(llvm::StringRef Message = "")
+      : Message(Message), FileOffset(0) {}
 
   /// Constructs a diagnostic message with anoffset to the diagnostic
   /// within the file where the problem occurred.
@@ -66,20 +72,20 @@ struct DiagnosticMessage {
 /// Represents the diagnostic with the level of severity and possible
 /// fixes to be applied.
 struct Diagnostic {
-  enum Level {
-    Remark = DiagnosticsEngine::Remark,
-    Warning = DiagnosticsEngine::Warning,
-    Error = DiagnosticsEngine::Error
-  };
+  enum Level { Remark, Warning, Error };
 
   Diagnostic() = default;
 
   Diagnostic(llvm::StringRef DiagnosticName, Level DiagLevel,
-             StringRef BuildDirectory);
+             llvm::StringRef BuildDirectory)
+      : DiagnosticName(DiagnosticName), DiagLevel(DiagLevel),
+        BuildDirectory(BuildDirectory) {}
 
   Diagnostic(llvm::StringRef DiagnosticName, const DiagnosticMessage &Message,
-             const SmallVector<DiagnosticMessage, 1> &Notes, Level DiagLevel,
-             llvm::StringRef BuildDirectory);
+             const llvm::SmallVector<DiagnosticMessage, 1> &Notes,
+             Level DiagLevel, llvm::StringRef BuildDirectory)
+      : DiagnosticName(DiagnosticName), Message(Message), Notes(Notes),
+        DiagLevel(DiagLevel), BuildDirectory(BuildDirectory) {}
 
   /// Name identifying the Diagnostic.
   std::string DiagnosticName;
@@ -88,7 +94,7 @@ struct Diagnostic {
   DiagnosticMessage Message;
 
   /// Potential notes about the diagnostic.
-  SmallVector<DiagnosticMessage, 1> Notes;
+  llvm::SmallVector<DiagnosticMessage, 1> Notes;
 
   /// Diagnostic level. Can indicate either an error or a warning.
   Level DiagLevel;

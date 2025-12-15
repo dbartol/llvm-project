@@ -18,9 +18,6 @@
 namespace clang {
 namespace tooling {
 
-DiagnosticMessage::DiagnosticMessage(llvm::StringRef Message)
-    : Message(Message), FileOffset(0) {}
-
 DiagnosticMessage::DiagnosticMessage(llvm::StringRef Message,
                                      const SourceManager &Sources,
                                      SourceLocation Loc)
@@ -44,18 +41,6 @@ FileByteRange::FileByteRange(
     Length = Sources.getFileOffset(Range.getEnd()) - FileOffset;
   }
 }
-
-Diagnostic::Diagnostic(llvm::StringRef DiagnosticName,
-                       Diagnostic::Level DiagLevel, StringRef BuildDirectory)
-    : DiagnosticName(DiagnosticName), DiagLevel(DiagLevel),
-      BuildDirectory(BuildDirectory) {}
-
-Diagnostic::Diagnostic(llvm::StringRef DiagnosticName,
-                       const DiagnosticMessage &Message,
-                       const SmallVector<DiagnosticMessage, 1> &Notes,
-                       Level DiagLevel, llvm::StringRef BuildDirectory)
-    : DiagnosticName(DiagnosticName), Message(Message), Notes(Notes),
-      DiagLevel(DiagLevel), BuildDirectory(BuildDirectory) {}
 
 const llvm::StringMap<Replacements> *selectFirstFix(const Diagnostic& D) {
    if (!D.Message.Fix.empty())

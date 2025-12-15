@@ -208,6 +208,26 @@ SourceMgr::SrcBuffer::~SrcBuffer() {
   }
 }
 
+std::pair<const SourceMgr::SrcBuffer &, unsigned>
+SourceMgr::getFileAndOffset(SMLoc Loc) const {
+  unsigned BufferID = FindBufferContainingLoc(Loc);
+  assert(BufferID && "Invalid location!");
+
+  auto &SB = getBufferInfo(BufferID);
+  const char *Ptr = Loc.getPointer();
+  size_t Offset = Ptr - SB.Buffer->getBufferStart();
+
+  return {SB, Offset};
+}
+
+std::pair<llvm::StringRef, unsigned>
+SourceMgr::getPathAndOffset(SMLoc Loc) const {
+  auto FileAndOffset = getFileAndOffset(Loc);
+
+  return {FileAndOffset.first.Buffer->getBufferIdentifier(),
+          FileAndOffset.second};
+}
+
 std::pair<unsigned, unsigned>
 SourceMgr::getLineAndColumn(SMLoc Loc, unsigned BufferID) const {
   if (!BufferID)

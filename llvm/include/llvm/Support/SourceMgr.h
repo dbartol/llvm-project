@@ -218,6 +218,12 @@ public:
   LLVM_ABI std::pair<unsigned, unsigned>
   getLineAndColumn(SMLoc Loc, unsigned BufferID = 0) const;
 
+  LLVM_ABI std::pair<const SrcBuffer &, unsigned>
+  getFileAndOffset(SMLoc Loc) const;
+
+  LLVM_ABI std::pair<llvm::StringRef, unsigned>
+  getPathAndOffset(SMLoc Loc) const;
+
   /// Get a string with the \p SMLoc filename and line number
   /// formatted in the standard style.
   LLVM_ABI std::string
