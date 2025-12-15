@@ -191,7 +191,7 @@ const StaticDiagInfoRec StaticDiagInfo[] = {
 // clang-format off
 #define DIAG(ENUM, CLASS, DEFAULT_SEVERITY, DESC, GROUP, SFINAE, NOWERROR,     \
              SHOWINSYSHEADER, SHOWINSYSMACRO, DEFERRABLE, CATEGORY, STABLE_ID, \
-             LEGACY_STABLE_IDS)                                                   \
+             LEGACY_STABLE_IDS)                                                \
   {                                                                            \
       diag::ENUM,                                                              \
       DEFAULT_SEVERITY,                                                        \
@@ -484,6 +484,8 @@ std::string DiagnosticIDs::getStableID(unsigned DiagID) const {
     return Info->getStableID().str();
   assert(CustomDiagInfo && "Invalid CustomDiagInfo");
   // TODO: Stable IDs for custom diagnostics?
+  // If we have to go through every custom diagnostic and add a stable ID, we
+  // should instead just go replace them all with declared diagnostics.
   return std::to_string(DiagID);
 }
 
@@ -495,6 +497,8 @@ DiagnosticIDs::getLegacyStableIDs(unsigned DiagID) const {
     return Info->getLegacyStableIDs();
   assert(CustomDiagInfo && "Invalid CustomDiagInfo");
   // TODO: Stable IDs for custom diagnostics?
+  // If we have to go through every custom diagnostic and add a stable ID, we
+  // should instead just go replace them all with declared diagnostics.
   return {};
 }
 
