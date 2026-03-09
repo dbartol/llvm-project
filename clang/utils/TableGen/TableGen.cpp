@@ -131,7 +131,7 @@ enum ActionType {
 namespace {
 cl::opt<MissingStableIDActionKind> MissingStableIDAction(
     "enforce-stable-ids", cl::desc("Enforce stable IDs on diagnostics:"),
-    cl::values(clEnumValN(MissingStableIDActionKind::None, "none (default",
+    cl::values(clEnumValN(MissingStableIDActionKind::None, "none (default)",
                           "No action"),
                clEnumValN(MissingStableIDActionKind::Warning, "warning",
                           "Emit warnings"),
