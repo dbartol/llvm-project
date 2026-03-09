@@ -25,7 +25,7 @@ struct TableGenOutputFiles {
   TableGenOutputFiles() = default;
 
   explicit TableGenOutputFiles(
-      llvm::StringRef MainFile,
+      std::string &&MainFile,
       std::map<StringRef, std::string> &&AdditionalFiles = {})
       : MainFile(MainFile), AdditionalFiles(AdditionalFiles) {}
 

@@ -121,6 +121,7 @@ enum ActionType {
   GenRISCVAndesVectorBuiltinCG,
   GenRISCVAndesVectorBuiltinSema,
   GenAttrDocs,
+  GenBuiltinDocs,
   GenDiagDocs,
   GenOptDocs,
   GenDataCollectors,
@@ -358,6 +359,8 @@ cl::opt<ActionType> Action(
                    "Generate riscv_andes_vector_builtin_sema.inc for clang"),
         clEnumValN(GenAttrDocs, "gen-attr-docs",
                    "Generate attribute documentation"),
+        clEnumValN(GenBuiltinDocs, "gen-builtin-docs",
+                   "Generate builtin documentation"),
         clEnumValN(GenDiagDocs, "gen-diag-docs",
                    "Generate diagnostic documentation"),
         clEnumValN(GenOptDocs, "gen-opt-docs", "Generate option documentation"),
@@ -673,6 +676,9 @@ bool ClangTableGenMain(TableGenOutputFiles &OutFiles,
     break;
   case GenAttrDocs:
     EmitClangAttrDocs(Records, OS);
+    break;
+  case GenBuiltinDocs:
+    EmitClangBuiltinDocs(Records, OS);
     break;
   case GenDiagDocs:
     EmitClangDiagDocs(Records, OS);
