@@ -22,10 +22,20 @@ class raw_ostream;
 class RecordKeeper;
 
 struct TableGenOutputFiles {
+  TableGenOutputFiles() = default;
+
+  explicit TableGenOutputFiles(
+      llvm::StringRef MainFile,
+      std::map<StringRef, std::string> &&AdditionalFiles = {})
+      : MainFile(MainFile), AdditionalFiles(AdditionalFiles) {}
+
   std::string MainFile;
 
   // Translates additional output file names to their contents.
   std::map<StringRef, std::string> AdditionalFiles;
+
+  // YAML content with suggested fixes for warnings and errors.
+  std::string Fixes;
 };
 
 /// Returns true on error, false otherwise.

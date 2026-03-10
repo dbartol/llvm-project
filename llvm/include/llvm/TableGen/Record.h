@@ -1658,6 +1658,7 @@ private:
   SmallVector<SMLoc, 4> Locs;
   SmallVector<SMLoc, 0> ForwardDeclarationLocs;
   mutable SmallVector<SMRange, 0> ReferenceLocs;
+  SMLoc EndOfBaseListLoc;
   SmallVector<const Init *, 0> TemplateArgs;
   SmallVector<RecordVal, 0> Values;
   SmallVector<AssertionInfo, 0> Assertions;
@@ -1726,6 +1727,9 @@ public:
 
   /// Add a reference to this record value.
   void appendReferenceLoc(SMRange Loc) const { ReferenceLocs.push_back(Loc); }
+
+  SMLoc getEndOfBaseListLoc() const { return EndOfBaseListLoc; }
+  void setEndOfBaseListLoc(SMLoc Loc) { EndOfBaseListLoc = Loc; }
 
   /// Return the references of this record value.
   ArrayRef<SMRange> getReferenceLocs() const { return ReferenceLocs; }

@@ -42,12 +42,7 @@ using namespace tooling;
 
 static const char * const InvalidLocation = "";
 
-Replacement::Replacement() : FilePath(InvalidLocation) {}
-
-Replacement::Replacement(StringRef FilePath, unsigned Offset, unsigned Length,
-                         StringRef ReplacementText)
-    : FilePath(std::string(FilePath)), ReplacementRange(Offset, Length),
-      ReplacementText(std::string(ReplacementText)) {}
+const LangOptions Replacement::DefaultLangOptions;
 
 Replacement::Replacement(const SourceManager &Sources, SourceLocation Start,
                          unsigned Length, StringRef ReplacementText) {
@@ -92,31 +87,6 @@ std::string Replacement::toString() const {
   return Stream.str();
 }
 
-namespace clang {
-namespace tooling {
-
-bool operator<(const Replacement &LHS, const Replacement &RHS) {
-  if (LHS.getOffset() != RHS.getOffset())
-    return LHS.getOffset() < RHS.getOffset();
-
-  if (LHS.getLength() != RHS.getLength())
-    return LHS.getLength() < RHS.getLength();
-
-  if (LHS.getFilePath() != RHS.getFilePath())
-    return LHS.getFilePath() < RHS.getFilePath();
-  return LHS.getReplacementText() < RHS.getReplacementText();
-}
-
-bool operator==(const Replacement &LHS, const Replacement &RHS) {
-  return LHS.getOffset() == RHS.getOffset() &&
-         LHS.getLength() == RHS.getLength() &&
-         LHS.getFilePath() == RHS.getFilePath() &&
-         LHS.getReplacementText() == RHS.getReplacementText();
-}
-
-} // namespace tooling
-} // namespace clang
-
 void Replacement::setFromSourceLocation(const SourceManager &Sources,
                                         SourceLocation Start, unsigned Length,
                                         StringRef ReplacementText) {
@@ -151,6 +121,14 @@ void Replacement::setFromSourceRange(const SourceManager &Sources,
   setFromSourceLocation(Sources, Sources.getSpellingLoc(Range.getBegin()),
                         getRangeSize(Sources, Range, LangOpts),
                         ReplacementText);
+}
+
+void Replacement::setFromSourceRange(const SourceManager &Sources,
+                                     const SourceRange &Range,
+                                     StringRef ReplacementText,
+                                     const LangOptions &LangOpts) {
+  setFromSourceRange(Sources, CharSourceRange::getTokenRange(Range),
+                     ReplacementText, LangOpts);
 }
 
 Replacement

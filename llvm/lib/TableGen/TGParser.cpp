@@ -3846,6 +3846,7 @@ bool TGParser::ParseObjectBody(Record *CurRec) {
       SubClass = ParseSubClassReference(CurRec, false);
     }
   }
+  CurRec->setEndOfBaseListLoc(Lex.getLoc());
 
   if (ApplyLetStack(CurRec))
     return true;
