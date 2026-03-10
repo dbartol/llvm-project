@@ -1928,11 +1928,10 @@ TableGenOutputFiles RegisterInfoEmitter::run(StringRef FilenamePrefix) {
 
   // The suffixes should be in sync with the tablegen function in
   // llvm/cmake/modules/TableGen.cmake.
-  return {std::move(Main),
-          {{"Enums.inc", Enums},
-           {"MCDesc.inc", MCDesc},
-           {"Header.inc", Header},
-           {"TargetDesc.inc", TargetDesc}}};
+  return TableGenOutputFiles(std::move(Main), {{"Enums.inc", Enums},
+                                               {"MCDesc.inc", MCDesc},
+                                               {"Header.inc", Header},
+                                               {"TargetDesc.inc", TargetDesc}});
 }
 
 template <typename InfoTy, typename FnTy>

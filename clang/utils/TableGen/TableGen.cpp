@@ -12,6 +12,7 @@
 
 #include "ASTTableGen.h"
 #include "TableGenBackends.h" // Declares all backends.
+#include "clang/Tooling/DiagnosticsYaml.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -21,6 +22,7 @@
 
 using namespace llvm;
 using namespace clang;
+using namespace clang::tooling;
 
 enum ActionType {
   PrintRecords,
@@ -127,6 +129,15 @@ enum ActionType {
 };
 
 namespace {
+cl::opt<MissingStableIDActionKind> MissingStableIDAction(
+    "enforce-stable-ids", cl::desc("Enforce stable IDs on diagnostics:"),
+    cl::values(clEnumValN(MissingStableIDActionKind::None, "none (default)",
+                          "No action"),
+               clEnumValN(MissingStableIDActionKind::Warning, "warning",
+                          "Emit warnings"),
+               clEnumValN(MissingStableIDActionKind::Error, "error",
+                          "Emit errors")));
+
 cl::opt<ActionType> Action(
     cl::desc("Action to perform:"),
     cl::values(
@@ -365,7 +376,15 @@ ClangComponent("clang-component",
                cl::desc("Only use warnings from specified component"),
                cl::value_desc("component"), cl::Hidden);
 
-bool ClangTableGenMain(raw_ostream &OS, const RecordKeeper &Records) {
+bool ClangTableGenMain(TableGenOutputFiles &OutFiles,
+                       const RecordKeeper &Records) {
+  std::string S;
+  raw_string_ostream OS(S);
+
+  TranslationUnitDiagnostics Diagnostics;
+  Diagnostics.MainSourceFile = Records.getInputFilename();
+
+  bool Result = false;
   switch (Action) {
   case PrintRecords:
     OS << Records;           // No argument, dump all contents
@@ -452,7 +471,8 @@ bool ClangTableGenMain(raw_ostream &OS, const RecordKeeper &Records) {
     EmitClangDiagsCompatIDs(Records, OS, ClangComponent);
     break;
   case GenClangDiagsDefs:
-    EmitClangDiagsDefs(Records, OS, ClangComponent);
+    Result = EmitClangDiagsDefs(Records, OS, ClangComponent,
+                                MissingStableIDAction, Diagnostics);
     break;
   case GenClangDiagsEnums:
     EmitClangDiagsEnums(Records, OS, ClangComponent);
@@ -674,7 +694,15 @@ bool ClangTableGenMain(raw_ostream &OS, const RecordKeeper &Records) {
     break;
   }
 
-  return false;
+  OutFiles.MainFile = S;
+  if (!Diagnostics.Diagnostics.empty()) {
+    raw_string_ostream FixesOS(OutFiles.Fixes);
+
+    yaml::Output YAML(FixesOS);
+    YAML << Diagnostics;
+  }
+
+  return Result;
 }
 }
 

@@ -60,6 +60,11 @@ static cl::list<std::string>
 MacroNames("D", cl::desc("Name of the macro to be defined"),
             cl::value_desc("macro name"), cl::Prefix);
 
+static cl::opt<std::string>
+    ExportFixes("export-fixes",
+                cl::desc("Export suggested fixes to a YAML file"),
+                cl::value_desc("filename"), cl::init(""));
+
 static cl::opt<bool>
 WriteIfChanged("write-if-changed", cl::desc("Only write output if it changed"));
 
@@ -199,6 +204,22 @@ int llvm::TableGenMain(const char *argv0, MultiFileTableGenMainFn MainFn) {
     if (int Ret = WriteOutput(argv0, Filename, Content))
       return Ret;
   }
+  if (!ExportFixes.empty()) {
+    if (int Ret = WriteOutput(argv0, ExportFixes, OutFiles.Fixes))
+      return Ret;
+    if (!OutFiles.Fixes.empty()) {
+      SmallString<128> FixesDirectory(ExportFixes);
+      sys::path::remove_filename(FixesDirectory);
+      StringRef ExecutableName = sys::path::filename(argv0);
+      SrcMgr.PrintMessage(
+          SMLoc(), SourceMgr::DK_Warning,
+          Twine(ExecutableName) +
+              " produced some suggested fixes. To apply all suggested fixes, "
+              "run: clang-apply-replacements \"" +
+              FixesDirectory + "\"",
+          {});
+    }
+  }
 
   Timer.stopTimer();
   Timer.stopPhaseTiming();
@@ -214,7 +235,7 @@ int llvm::TableGenMain(const char *argv0, TableGenMainFn MainFn) {
     std::string S;
     raw_string_ostream OS(S);
     int Res = MainFn(OS, Records);
-    OutFiles = {std::move(S), {}};
+    OutFiles = TableGenOutputFiles(std::move(S));
     return Res;
   });
 }

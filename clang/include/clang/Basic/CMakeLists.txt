@@ -1,6 +1,15 @@
-macro(clang_diag_gen component)
+function(clang_diag_gen component)
+  set(STABLE_ID_ARGS "")
+  if(CLANG_ENFORCE_STABLE_IDS)
+    set(FIXES_DIR "${CMAKE_CURRENT_BINARY_DIR}/clang-tblgen-fixes")
+    file(MAKE_DIRECTORY ${FIXES_DIR})
+    list(APPEND STABLE_ID_ARGS "-enforce-stable-ids=${CLANG_ENFORCE_STABLE_IDS}")
+    list(APPEND STABLE_ID_ARGS "-export-fixes=${CMAKE_CURRENT_BINARY_DIR}/clang-tblgen-fixes/${component}.yaml")
+  endif()
+
   clang_tablegen(Diagnostic${component}Kinds.inc
     -gen-clang-diags-defs -clang-component=${component}
+    ${STABLE_ID_ARGS}
     SOURCE Diagnostic.td
     TARGET ClangDiagnostic${component})
 
@@ -18,7 +27,7 @@ macro(clang_diag_gen component)
     -gen-clang-diags-iface -clang-component=${component}
     SOURCE Diagnostic.td
     TARGET ClangDiagnostic${component}Interface)
-endmacro(clang_diag_gen)
+endfunction(clang_diag_gen)
 
 clang_diag_gen(Analysis)
 clang_diag_gen(AST)

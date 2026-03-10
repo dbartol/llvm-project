@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TableGenBackends.h"
+#include "clang/Tooling/DiagnosticsYaml.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
@@ -20,6 +21,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Format.h"
 #include "llvm/TableGen/Error.h"
 #include "llvm/TableGen/Record.h"
@@ -32,10 +34,19 @@
 #include <optional>
 #include <set>
 using namespace llvm;
+using namespace clang::tooling;
 
 //===----------------------------------------------------------------------===//
 // Diagnostic category computation code.
 //===----------------------------------------------------------------------===//
+
+// Outside of clang-tblgen, this definition comes from the tooling library.
+// Here, we provide a simpler definition, because we don't need the additional
+// validation that the replacements are conflict-free.
+llvm::Error clang::tooling::Replacements::add(const Replacement &R) {
+  Replaces.insert(R);
+  return llvm::Error::success();
+}
 
 namespace {
 class DiagGroupParentMap {
@@ -1333,6 +1344,18 @@ static bool isRemark(const Record &Diag) {
   return Diag.getValueAsDef("Class")->getName() == "CLASS_REMARK";
 }
 
+static bool isWarning(const Record &Diag) {
+  return Diag.getValueAsDef("Class")->getName() == "CLASS_WARNING";
+}
+
+static bool isExtension(const Record &Diag) {
+  return Diag.getValueAsDef("Class")->getName() == "CLASS_EXTENSION";
+}
+
+static bool shouldHaveStableID(const Record &Diag) {
+  return isWarning(Diag) || isExtension(Diag);
+}
+
 // Presumes the text has been split at the first whitespace or hyphen.
 static bool isExemptAtStart(StringRef Text) {
   // Fast path, the first character is lowercase or not alphanumeric.
@@ -1680,6 +1703,19 @@ void clang::EmitClangDiagsEnums(const RecordKeeper &Records, raw_ostream &OS,
 
 namespace {
 
+/// Gets the Stable ID for the specified Diagnostic record.
+/// The Stable ID can be explicitly specified via the "StableId"
+/// property. If not specified explicitly, the Stable ID defaults
+/// to the name of the diagnostic.
+StringRef getStableID(const Record &R) {
+  StringRef StableID = R.getValueAsString("StableId");
+  if (!StableID.empty()) {
+    return StableID;
+  } else {
+    return R.getName();
+  }
+}
+
 /// Holds the string table for all Stable IDs, plus the arrays of legacy Stable
 /// IDs for renamed diagnostics.
 class DiagStableIDsMap {
@@ -1744,15 +1780,6 @@ public:
   }
 
 private:
-  /// Gets the Stable ID for the specified Diagnostic record.
-  /// The Stable ID can be explicitly specified via the "StableId"
-  /// property. If not specified explicitly, the Stable ID defaults
-  /// to the name of the diagnostic.
-  static StringRef getStableID(const Record &R) {
-    StringRef StableID = R.getValueAsString("StableId");
-    return StableID.empty() ? R.getName() : StableID;
-  }
-
   /// Emit a list of stable IDs, used by both the "StableId" and
   /// "LegacyStableIds" properties.
   ///
@@ -1807,8 +1834,10 @@ void clang::EmitClangDiagsStableIDs(const RecordKeeper &Records,
 
 /// ClangDiagsDefsEmitter - The top-level class emits .def files containing
 /// declarations of Clang diagnostics.
-void clang::EmitClangDiagsDefs(const RecordKeeper &Records, raw_ostream &OS,
-                               const std::string &Component) {
+bool clang::EmitClangDiagsDefs(const RecordKeeper &Records, raw_ostream &OS,
+                               const std::string &Component,
+                               MissingStableIDActionKind MissingStableIDAction,
+                               TranslationUnitDiagnostics &TUD) {
   // Write the #if guard
   if (!Component.empty()) {
     std::string ComponentName = StringRef(Component).upper();
@@ -1839,6 +1868,10 @@ void clang::EmitClangDiagsDefs(const RecordKeeper &Records, raw_ostream &OS,
   InferPedantic inferPedantic(DGParentMap, Diags, DiagGroups, DiagsInGroup);
   inferPedantic.compute(&DiagsInPedantic, (RecordVec*)nullptr);
 
+  // Track which stable IDs have already been used to detect duplicates.
+  std::map<StringRef, const Record *> StableIDOccurrences;
+
+  bool Failed = false;
   for (const Record &R : make_pointee_range(Diags)) {
     // Check if this is an error that is accidentally in a warning
     // group.
@@ -1859,9 +1892,75 @@ void clang::EmitClangDiagsDefs(const RecordKeeper &Records, raw_ostream &OS,
       }
     }
 
+    // Ensure that this diagnostic's stable ID is unique.
+    // We do this before the component filtering because the stable ID needs to
+    // be unique across all components.
+    StringRef StableID = getStableID(R);
+    SMLoc Loc = R.getLoc().front();
+    auto Occ = StableIDOccurrences.insert({StableID, &R});
+    if (!Occ.second) {
+      SrcMgr.PrintMessage(Loc, SourceMgr::DK_Error,
+                          "Duplicate stable ID '" + StableID + "'", {});
+      SrcMgr.PrintMessage(Occ.first->second->getLoc().front(),
+                          SourceMgr::DK_Note, "Also used here.", {});
+      Failed = true;
+    }
+
     // Filter by component.
     if (!Component.empty() && Component != R.getValueAsString("Component"))
       continue;
+
+    if ((MissingStableIDAction != MissingStableIDActionKind::None) &&
+        shouldHaveStableID(R)) {
+      StringRef ExplicitStableID = R.getValueAsString("StableId");
+      if (ExplicitStableID.empty()) {
+        // No explicit stable ID. Warn, and suggest a fix if possible
+        auto MessageText =
+            Twine("Diagnostic " + R.getName() + " does not have a stable ID")
+                .str();
+
+        SourceMgr::DiagKind DiagKind = SourceMgr::DK_Warning;
+        if (MissingStableIDAction == MissingStableIDActionKind::Error) {
+          DiagKind = SourceMgr::DK_Error;
+          Failed = true;
+        }
+        SrcMgr.PrintMessage(Loc, DiagKind, MessageText, {});
+
+        // If we know where the end of the def's base list is, suggest inserting
+        // an explicit `StableId<>` base there. We don't always know this
+        // location, primarily for defs that occur within a multiclass. There
+        // are few enough of those that we can just require the developer to
+        // manually add the stable IDs for those defs.
+        SMLoc EndOfBaseListLoc = R.getEndOfBaseListLoc();
+        if (EndOfBaseListLoc.isValid()) {
+          auto InsertText = Twine(", StableId<\"" + R.getName() + "\">").str();
+
+          DiagnosticMessage Message(MessageText);
+          auto PathAndOffset = SrcMgr.getPathAndOffset(EndOfBaseListLoc);
+          Message.FilePath = PathAndOffset.first;
+          Message.FileOffset = PathAndOffset.second;
+
+          auto &Replacements = Message.Fix[PathAndOffset.first];
+          Replacement Repl(PathAndOffset.first, PathAndOffset.second, 0,
+                           InsertText);
+          auto E = Replacements.add(Repl);
+          if (E) {
+            assert(
+                false &&
+                "Replacements.add() should not fail in clang-tblgen builds.");
+          }
+
+          TUD.Diagnostics.push_back(Diagnostic("Missing stable ID", Message, {},
+                                               Diagnostic::Warning, ""));
+
+          SMFixIt FixIt(SMRange(EndOfBaseListLoc, EndOfBaseListLoc),
+                        InsertText);
+          SrcMgr.PrintMessage(EndOfBaseListLoc, SourceMgr::DK_Note,
+                              "Specify the stable ID using StableId<> here.",
+                              {}, {FixIt});
+        }
+      }
+    }
 
     // Validate diagnostic wording for common issues.
     verifyDiagnosticWording(R);
@@ -1927,6 +2026,8 @@ void clang::EmitClangDiagsDefs(const RecordKeeper &Records, raw_ostream &OS,
 
     OS << ")\n";
   }
+
+  return Failed;
 }
 
 //===----------------------------------------------------------------------===//

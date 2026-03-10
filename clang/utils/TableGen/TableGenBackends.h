@@ -23,6 +23,11 @@ class RecordKeeper;
 } // namespace llvm
 
 namespace clang {
+namespace tooling {
+struct TranslationUnitDiagnostics;
+}
+
+enum class MissingStableIDActionKind { None, Warning, Error };
 
 void EmitCIRLowering(const llvm::RecordKeeper &RK, llvm::raw_ostream &OS);
 void EmitClangDeclContext(const llvm::RecordKeeper &RK, llvm::raw_ostream &OS);
@@ -101,8 +106,10 @@ void EmitClangBuiltinTemplates(const llvm::RecordKeeper &Records,
 void EmitClangDiagsCompatIDs(const llvm::RecordKeeper &Records,
                              llvm::raw_ostream &OS,
                              const std::string &Component);
-void EmitClangDiagsDefs(const llvm::RecordKeeper &Records,
-                        llvm::raw_ostream &OS, const std::string &Component);
+bool EmitClangDiagsDefs(const llvm::RecordKeeper &Records,
+                        llvm::raw_ostream &OS, const std::string &Component,
+                        MissingStableIDActionKind MissingStableIDAction,
+                        tooling::TranslationUnitDiagnostics &TUD);
 void EmitClangDiagsEnums(const llvm::RecordKeeper &Records,
                          llvm::raw_ostream &OS, const std::string &Component);
 void EmitClangDiagGroups(const llvm::RecordKeeper &Records,
